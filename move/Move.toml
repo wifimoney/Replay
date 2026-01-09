@@ -1,0 +1,16 @@
+[package]
+name = "replay_fee_splitter"
+version = "1.0.0"
+authors = []
+
+[addresses]
+replay_fee_splitter = "0xcf04d9e23941c75cd330349daa50b140acb9be3cd4da96f5f62ee4b634ede904"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "movement"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

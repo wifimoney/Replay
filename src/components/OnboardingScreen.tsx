@@ -74,7 +74,7 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
             </main>
 
             {/* Footer */}
-            <footer className="w-full p-8 pb-12 z-10 flex justify-center">
+            <footer className="w-full p-8 pb-12 z-10 flex flex-col items-center gap-4">
                 <Button
                     onClick={handleGetStarted}
                     disabled={!ready}
@@ -82,6 +82,13 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
                 >
                     Get started
                 </Button>
+                <button
+                    onClick={handleGetStarted}
+                    disabled={!ready}
+                    className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-4 transition-colors"
+                >
+                    I already have a wallet
+                </button>
             </footer>
         </div>
     );

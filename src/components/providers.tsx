@@ -91,10 +91,11 @@ export function Providers({ children }: ProvidersProps) {
         <PrivyProvider
             appId={appId}
             config={{
-                loginMethods: ['email', 'sms'],
+                loginMethods: ['email', 'sms', 'wallet'],
                 appearance: {
                     theme: 'dark',
                     accentColor: '#ffffff',
+                    walletList: ['metamask', 'wallet_connect', 'coinbase_wallet', 'rainbow'],
                 },
                 embeddedWallets: {
                     createOnLogin: 'all-users',
