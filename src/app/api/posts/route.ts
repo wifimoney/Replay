@@ -1,17 +1,10 @@
-/**
- * GET /api/posts
- * POST /api/posts
- * 
- * Fetch all posts or create a new post.
- * Creating posts is free (no x402 payment required).
- */
-
+// ... imports
 import { NextRequest, NextResponse } from 'next/server';
-import { getPosts, createPost, getOrCreateUser } from '@/lib/store';
+import { getPosts, createPost, getOrCreateUser } from '@/lib/db'; // CHANGED: store -> db
 
 export async function GET() {
     try {
-        const posts = getPosts();
+        const posts = await getPosts(); // Added await
         return NextResponse.json({ posts });
     } catch (error) {
         console.error('Error fetching posts:', error);
@@ -48,10 +41,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Get or create user
-        const user = getOrCreateUser(walletAddress);
+        const user = await getOrCreateUser(walletAddress); // Added await
 
         // Create the post
-        const post = createPost(user.id, content);
+        const post = await createPost(user.id, content); // Added await
 
         return NextResponse.json(
             { post, message: 'Post created successfully' },

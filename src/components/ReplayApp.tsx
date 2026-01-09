@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/components/ui/utils';
 import { useAuth } from '@/components/providers';
+import { usePayment } from '@/hooks/usePayment';
 import { toast } from '@/components/ui/sonner';
 import Image from 'next/image';
 
@@ -168,9 +169,10 @@ interface ReplyModalProps {
     postAuthor: string;
     onSubmit: (content: string) => Promise<void>;
     isSubmitting: boolean;
+    status: 'idle' | 'signing' | 'confirming' | 'success' | 'error';
 }
 
-const ReplyModal = ({ isOpen, onClose, postAuthor, onSubmit, isSubmitting }: ReplyModalProps) => {
+const ReplyModal = ({ isOpen, onClose, postAuthor, onSubmit, isSubmitting, status }: ReplyModalProps) => {
     const [content, setContent] = useState('');
 
     const handleSubmit = async () => {
@@ -213,10 +215,15 @@ const ReplyModal = ({ isOpen, onClose, postAuthor, onSubmit, isSubmitting }: Rep
                         disabled={!content.trim() || isSubmitting}
                         className="w-full rounded-md h-10 font-medium text-sm bg-zinc-100 hover:bg-zinc-200 text-black"
                     >
-                        {isSubmitting ? (
+                        {status === 'signing' ? (
                             <>
                                 <Loader2 className="size-4 animate-spin mr-2" />
-                                Sending...
+                                Check Wallet...
+                            </>
+                        ) : status === 'confirming' ? (
+                            <>
+                                <Loader2 className="size-4 animate-spin mr-2" />
+                                Confirming...
                             </>
                         ) : (
                             <>Send reply · 0.001 MOVE</>
@@ -230,9 +237,10 @@ const ReplyModal = ({ isOpen, onClose, postAuthor, onSubmit, isSubmitting }: Rep
 
 interface PaymentConfirmationProps {
     isVisible: boolean;
+    status: string;
 }
 
-const PaymentConfirmation = ({ isVisible }: PaymentConfirmationProps) => {
+const PaymentConfirmation = ({ isVisible, status }: PaymentConfirmationProps) => {
     if (!isVisible) return null;
 
     return (
@@ -246,8 +254,12 @@ const PaymentConfirmation = ({ isVisible }: PaymentConfirmationProps) => {
                     <Loader2 className="size-6 text-zinc-500 animate-spin" />
                 </div>
                 <div>
-                    <h4 className="font-semibold text-sm text-zinc-100">Confirm Transaction</h4>
-                    <p className="text-xs font-normal text-zinc-500 mt-1">Signing message from embedded wallet</p>
+                    <h4 className="font-semibold text-sm text-zinc-100">
+                        {status === 'signing' ? 'Check your wallet' : 'Confirming on-chain'}
+                    </h4>
+                    <p className="text-xs font-normal text-zinc-500 mt-1">
+                        {status === 'signing' ? 'Sign the message to pay' : 'Waiting for Movement finality'}
+                    </p>
                 </div>
                 <div className="w-full border rounded p-3 flex justify-between text-xs font-normal bg-zinc-900/50 border-zinc-800 text-zinc-400">
                     <span>Network Fee</span>
@@ -262,9 +274,9 @@ const PaymentConfirmation = ({ isVisible }: PaymentConfirmationProps) => {
 
 export function ReplayApp() {
     const { authenticated, login, user } = useAuth();
+    const { status, submitPaidReply } = usePayment();
+
     const [showReplyModal, setShowReplyModal] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
     const [replies, setReplies] = useState<Reply[]>(DEMO_POST.replies);
 
     const handleReplyClick = () => {
@@ -276,31 +288,30 @@ export function ReplayApp() {
     };
 
     const handleSubmitReply = async (content: string) => {
-        setIsSubmitting(true);
-        setShowPaymentConfirm(true);
+        // The hook handles the heavy lifting
+        const result = await submitPaidReply(DEMO_POST.id, content);
 
-        // Simulate x402 payment flow
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (result && result.reply) {
+            // Add the new reply from the server response
+            const newReply: Reply = {
+                id: result.reply.id,
+                username: user?.email?.address?.split('@')[0] || 'you',
+                content: result.reply.content,
+                timestamp: 'Just now',
+                avatar: '/images/c182f51e83778ff6dafa8298b6fbde59370d61c5.png',
+                paymentTxHash: result.txHash,
+            };
 
-        // Add the new reply
-        const newReply: Reply = {
-            id: Date.now().toString(),
-            username: user?.email?.address?.split('@')[0] || 'you',
-            content,
-            timestamp: 'Just now',
-            avatar: '/images/c182f51e83778ff6dafa8298b6fbde59370d61c5.png',
-            paymentTxHash: '0x...',
-        };
+            setReplies(prev => [...prev, newReply]);
+            setShowReplyModal(false);
 
-        setReplies(prev => [...prev, newReply]);
-        setShowPaymentConfirm(false);
-        setIsSubmitting(false);
-        setShowReplyModal(false);
-
-        toast.success('Reply sent!', {
-            description: 'Your reply has been posted successfully.',
-        });
+            toast.success('Reply sent!', {
+                description: `Payment confirmed. Tx: ${result.txHash.slice(0, 6)}...`,
+            });
+        }
     };
+
+    const isProcessing = status === 'signing' || status === 'confirming';
 
     return (
         <div className="w-full max-w-[375px] h-[667px] mx-auto shadow-2xl overflow-hidden relative flex flex-col bg-[#09090b] border border-zinc-800">
@@ -317,11 +328,12 @@ export function ReplayApp() {
                 onClose={() => setShowReplyModal(false)}
                 postAuthor={DEMO_POST.username}
                 onSubmit={handleSubmitReply}
-                isSubmitting={isSubmitting}
+                isSubmitting={isProcessing}
+                status={status}
             />
 
             {/* Payment Confirmation Overlay */}
-            <PaymentConfirmation isVisible={showPaymentConfirm} />
+            <PaymentConfirmation isVisible={isProcessing} status={status} />
         </div>
     );
 }

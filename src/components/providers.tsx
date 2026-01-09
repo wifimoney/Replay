@@ -34,73 +34,41 @@ const movementTestnet = {
     testnet: true,
 };
 
-// Mock auth context for development without Privy
-interface MockAuthContext {
-    ready: boolean;
-    authenticated: boolean;
-    user: { email?: { address: string } } | null;
-    login: () => void;
-    logout: () => void;
+// Custom hook to access the unified auth context
+export const AuthContext = createContext<any>(null);
+
+export function useAuth() {
+    return useContext(AuthContext);
 }
 
-const MockAuthContext = createContext<MockAuthContext | null>(null);
-
-function MockAuthProvider({ children }: { children: React.ReactNode }) {
-    const [authenticated, setAuthenticated] = useState(false);
-
-    const login = useCallback(() => {
-        setAuthenticated(true);
-    }, []);
-
-    const logout = useCallback(() => {
-        setAuthenticated(false);
-    }, []);
-
+function PrivyAuthAdapter({ children }: { children: React.ReactNode }) {
+    const privy = usePrivyOriginal();
     return (
-        <MockAuthContext.Provider
-            value={{
-                ready: true,
-                authenticated,
-                user: authenticated ? { email: { address: 'demo@replay.app' } } : null,
-                login,
-                logout,
-            }}
-        >
+        <AuthContext.Provider value={privy}>
             {children}
-        </MockAuthContext.Provider>
+        </AuthContext.Provider>
     );
 }
 
-// Custom hook that uses either Privy or mock auth
-export function useAuth() {
-    const mockAuth = useContext(MockAuthContext);
+function MockAuthAdapter({ children }: { children: React.ReactNode }) {
+    const [authenticated, setAuthenticated] = useState(false);
 
-    // If we have mock auth context, use it
-    if (mockAuth) {
-        return mockAuth;
-    }
+    const login = useCallback(() => setAuthenticated(true), []);
+    const logout = useCallback(() => setAuthenticated(false), []);
 
-    // Otherwise, this will throw if not wrapped in PrivyProvider
-    // which is fine - we'll handle that case in the provider
-    try {
-        const privy = usePrivyOriginal();
-        return {
-            ready: privy.ready,
-            authenticated: privy.authenticated,
-            user: privy.user,
-            login: privy.login,
-            logout: privy.logout,
-        };
-    } catch {
-        // Fallback if hook fails
-        return {
-            ready: true,
-            authenticated: false,
-            user: null,
-            login: () => console.warn('Privy not configured'),
-            logout: () => { },
-        };
-    }
+    const value = {
+        ready: true,
+        authenticated,
+        user: authenticated ? { email: { address: 'demo@replay.app' } } : null,
+        login,
+        logout,
+    };
+
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
 }
 
 interface ProvidersProps {
@@ -111,9 +79,12 @@ export function Providers({ children }: ProvidersProps) {
     const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
     if (!appId) {
-        // Render with mock auth provider for development
         console.warn('NEXT_PUBLIC_PRIVY_APP_ID is not configured - using mock auth');
-        return <MockAuthProvider>{children}</MockAuthProvider>;
+        return (
+            <MockAuthAdapter>
+                {children}
+            </MockAuthAdapter>
+        );
     }
 
     return (
@@ -126,14 +97,17 @@ export function Providers({ children }: ProvidersProps) {
                     accentColor: '#ffffff',
                 },
                 embeddedWallets: {
-                    createOnLogin: 'users-without-wallets',
+                    createOnLogin: 'all-users',
                     showWalletUIs: false,
+                    noPromptOnSignature: true,
                 },
                 defaultChain: movementTestnet,
                 supportedChains: [movementTestnet],
             }}
         >
-            {children}
+            <PrivyAuthAdapter>
+                {children}
+            </PrivyAuthAdapter>
         </PrivyProvider>
     );
 }

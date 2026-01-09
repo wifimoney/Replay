@@ -1,11 +1,6 @@
-/**
- * GET /api/posts/[id]
- * 
- * Fetch a single post with its replies.
- */
-
+// ... imports
 import { NextRequest, NextResponse } from 'next/server';
-import { getPost } from '@/lib/store';
+import { getPost, getReplies } from '@/lib/db'; // CHANGED: store -> db
 
 export async function GET(
     request: NextRequest,
@@ -13,7 +8,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const post = getPost(id);
+        const post = await getPost(id); // Added await
 
         if (!post) {
             return NextResponse.json(
@@ -22,7 +17,16 @@ export async function GET(
             );
         }
 
-        return NextResponse.json({ post });
+        // Fetch replies as they are not included in getPost by default in the DB adapter
+        const replies = await getReplies(id);
+
+        // Attach replies to match the expected interface
+        const postWithReplies = {
+            ...post,
+            replies
+        };
+
+        return NextResponse.json({ post: postWithReplies });
     } catch (error) {
         console.error('Error fetching post:', error);
         return NextResponse.json(
